@@ -1,0 +1,27 @@
+{
+  "name": "@lirx/async-store",
+  "version": "1.0.0",
+  "description": "Description",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lirx-js/async-store"
+  },
+  "keywords": [],
+  "author": "Valentin Richard",
+  "license": "MIT",
+  "access": "public",
+  "devDependencies": {
+    "@types/jest": "^29.5.11"
+  },
+  "dependencies": {
+    "@lirx/async-task": "latest",
+    "@lirx/unsubscribe": "latest",
+    "@lirx/utils": "latest"
+  },
+  "localDependencies": [
+    "@lirx/async-task",
+    "@lirx/unsubscribe",
+    "@lirx/utils"
+  ],
+  "packageManager": "yarn@4.0.2"
+}
