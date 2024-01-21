@@ -2,8 +2,11 @@ import { Abortable, AsyncTask, IAbortableOptions } from '@lirx/async-task';
 import { IAsyncTaskConstraint } from '@lirx/async-task/src/async-task/types/async-task-constraint.type';
 import { noop } from '@lirx/utils';
 import { IAsyncStore } from '../../async-store.type';
-import { IAsyncStoreEntry } from '../../traits/entries/async-store.entries.function-definition';
+import { IAsyncStoreGetFunctionReturnedValue } from '../../traits/get/async-store.get.function-definition';
+import { IAsyncStoreSetFunctionValue } from '../../traits/set/async-store.set.function-definition';
+import { InferAsyncStoreEntryGKey, InferAsyncStoreEntryGValue } from '../../types/async-store-entry.type';
 import { promisifyIDBRequest } from './helpers/promisify-idb-request';
+import { IGenericIDBAsyncStoreEntry } from './types/idb-async-store-entry.type';
 
 /**
  * Doc:
@@ -20,22 +23,22 @@ export interface IIDBAsyncStoreOpenOptions extends IAbortableOptions, Omit<IIDBA
   readonly dbName?: string;
 }
 
-export class IDBAsyncStore implements IAsyncStore {
+export class IDBAsyncStore<GEntry extends IGenericIDBAsyncStoreEntry> implements IAsyncStore<GEntry> {
 
-  static open(
+  static open<GEntry extends IGenericIDBAsyncStoreEntry>(
     {
       dbName = 'async-store',
       storeName = 'keyval',
       abortable,
     }: IIDBAsyncStoreOpenOptions,
-  ): AsyncTask<IDBAsyncStore> {
+  ): AsyncTask<IDBAsyncStore<GEntry>> {
     return AsyncTask.fromFactory((abortable: Abortable): AsyncTask<IDBDatabase> => {
       const request: IDBOpenDBRequest = indexedDB.open(dbName);
       request.onupgradeneeded = () => request.result.createObjectStore(storeName);
       return promisifyIDBRequest<IDBDatabase>(request, abortable);
     }, abortable)
-      .successful((db: IDBDatabase): IDBAsyncStore => {
-        return new IDBAsyncStore({
+      .successful((db: IDBDatabase): IDBAsyncStore<GEntry> => {
+        return new IDBAsyncStore<GEntry>({
           db,
           storeName,
         });
@@ -75,18 +78,18 @@ export class IDBAsyncStore implements IAsyncStore {
     }, abortable);
   }
 
-  get(
-    key: string,
+  get<GKey extends InferAsyncStoreEntryGKey<GEntry>>(
+    key: GKey,
     abortable: Abortable,
-  ): AsyncTask<any> {
+  ): AsyncTask<IAsyncStoreGetFunctionReturnedValue<GEntry, GKey>> {
     return this.#runIDBRequest<any>((store: IDBObjectStore): IDBRequest<any> => {
       return store.get(key);
     }, 'readonly', abortable);
   }
 
-  set(
-    key: string,
-    value: any,
+  set<GKey extends InferAsyncStoreEntryGKey<GEntry>>(
+    key: GKey,
+    value: IAsyncStoreSetFunctionValue<GEntry, GKey>,
     abortable: Abortable,
   ): AsyncTask<void> {
     return this.#runIDBRequest<IDBValidKey>((store: IDBObjectStore): IDBRequest<IDBValidKey> => {
@@ -96,7 +99,7 @@ export class IDBAsyncStore implements IAsyncStore {
   }
 
   delete(
-    key: string,
+    key: InferAsyncStoreEntryGKey<GEntry>,
     abortable: Abortable,
   ): AsyncTask<void> {
     return this.#runIDBRequest<void>((store: IDBObjectStore): IDBRequest<void> => {
@@ -114,15 +117,15 @@ export class IDBAsyncStore implements IAsyncStore {
 
   keys(
     abortable: Abortable,
-  ): AsyncTask<string[]> {
-    return this.#runIDBRequest<string[]>((store: IDBObjectStore): IDBRequest<string[]> => {
-      return store.getAllKeys() as any;
-    }, 'readonly', abortable);
+  ): AsyncTask<InferAsyncStoreEntryGKey<GEntry>[]> {
+    return this.#runIDBRequest<IDBValidKey[]>((store: IDBObjectStore): IDBRequest<IDBValidKey[]> => {
+      return store.getAllKeys();
+    }, 'readonly', abortable) as AsyncTask<InferAsyncStoreEntryGKey<GEntry>[]>;
   }
 
   values(
     abortable: Abortable,
-  ): AsyncTask<any[]> {
+  ): AsyncTask<InferAsyncStoreEntryGValue<GEntry>[]> {
     return this.#runIDBRequest<any[]>((store: IDBObjectStore): IDBRequest<any[]> => {
       return store.getAll();
     }, 'readonly', abortable);
@@ -130,22 +133,34 @@ export class IDBAsyncStore implements IAsyncStore {
 
   entries(
     abortable: Abortable,
-  ): AsyncTask<IAsyncStoreEntry[]> {
+  ): AsyncTask<GEntry[]> {
     return AsyncTask.all([
       (abortable: Abortable) => this.keys(abortable),
       (abortable: Abortable) => this.values(abortable),
     ], abortable)
-      .successful(([keys, values]: [string[], any[]]): IAsyncStoreEntry[] => {
-        return keys.map((key: string, index: number): IAsyncStoreEntry => {
+      .successful(([keys, values]: [any[], any[]]): GEntry[] => {
+        return keys.map((key: any, index: number): GEntry => {
           return [
             key,
             values[index],
-          ];
+          ] as unknown as GEntry;
         });
       });
   }
 }
 
+export type IGenericIDBAsyncStore = IDBAsyncStore<IGenericIDBAsyncStoreEntry>;
 
-
+// const a = new IDBAsyncStore<['b', boolean]>(null as any);
+// const b = a.get('a', null as any);
+// const c = a.get('b', null as any);
+// const c = a.set('a', null as any, null as any);
+// const c = a.set('b', 'string', null as any);
+// const c = a.set('b', true, null as any);
+//
+// const fnc = (store: IGenericIDBAsyncStore) => {
+//
+// };
+//
+// fnc(a);
 

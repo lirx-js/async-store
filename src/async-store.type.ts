@@ -5,19 +5,21 @@ import { IAsyncStoreGetTrait } from './traits/get/async-store.get.trait';
 import { IAsyncStoreKeysTrait } from './traits/keys/async-store.keys.trait';
 import { IAsyncStoreSetTrait } from './traits/set/async-store.set.trait';
 import { IAsyncStoreValuesTrait } from './traits/values/async-store.values.trait';
+import { IGenericAsyncStoreEntry } from './types/async-store-entry.type';
 
-export interface IAsyncStore extends //
-  IAsyncStoreGetTrait,
-  IAsyncStoreSetTrait,
-  IAsyncStoreDeleteTrait,
+export interface IAsyncStore<GEntry extends IGenericAsyncStoreEntry> extends //
+  IAsyncStoreGetTrait<GEntry>,
+  IAsyncStoreSetTrait<GEntry>,
+  IAsyncStoreDeleteTrait<GEntry>,
   IAsyncStoreClearTrait,
-  IAsyncStoreKeysTrait,
-  IAsyncStoreValuesTrait,
-  IAsyncStoreEntriesTrait
+  IAsyncStoreKeysTrait<GEntry>,
+  IAsyncStoreValuesTrait<GEntry>,
+  IAsyncStoreEntriesTrait<GEntry>
 //
 {
 }
 
+export type IGenericAsyncStore = IAsyncStore<IGenericAsyncStoreEntry>;
 
 
 

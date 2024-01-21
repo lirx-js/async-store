@@ -1,45 +1,67 @@
-import { Abortable, AsyncTask, IAsyncTaskFactory } from '@lirx/async-task';
+import { Abortable, AsyncTask, IAsyncTaskFactory, IAsyncTaskInput } from '@lirx/async-task';
 import { IAsyncStore } from '../../async-store.type';
-import { IAsyncStoreEntry } from '../../traits/entries/async-store.entries.function-definition';
+import { IAsyncStoreGetFunctionReturnedValue } from '../../traits/get/async-store.get.function-definition';
+import { IAsyncStoreSetFunctionValue } from '../../traits/set/async-store.set.function-definition';
+import {
+  IAsyncStoreEntry,
+  IGenericAsyncStoreEntry,
+  InferAsyncStoreEntryGKey,
+  InferAsyncStoreEntryGValue,
+} from '../../types/async-store-entry.type';
 import { decryptDataUsingPassword } from './helpers/decrypt-data-using-password';
 import { encryptDataUsingPassword } from './helpers/encrypt-data-using-password';
 
-export interface IPasswordEncryptedAsyncStoreOptions {
-  readonly store: IAsyncStore;
+export type IPasswordEncryptedAsyncStoreSubStoreEntry<GEntry extends IGenericAsyncStoreEntry> =
+  IAsyncStoreEntry<InferAsyncStoreEntryGKey<GEntry>, Uint8Array>
+// GEntry extends IAsyncStoreEntry<infer GKey, any>
+//   ? IAsyncStoreEntry<GKey, Uint8Array>
+//   : any
+  ;
+
+export type IPasswordEncryptedAsyncStoreSubStore<GEntry extends IGenericAsyncStoreEntry> =
+  IAsyncStore<IPasswordEncryptedAsyncStoreSubStoreEntry<GEntry>>
+  ;
+
+export interface IPasswordEncryptedAsyncStoreOptions<GEntry extends IGenericAsyncStoreEntry> {
+  readonly store: IPasswordEncryptedAsyncStoreSubStore<GEntry>;
   readonly password: string;
 }
 
-export class PasswordEncryptedAsyncStore implements IAsyncStore {
-  readonly #store: IAsyncStore;
+export class PasswordEncryptedAsyncStore<GEntry extends IGenericAsyncStoreEntry> implements IAsyncStore<GEntry> {
+  readonly #store: IPasswordEncryptedAsyncStoreSubStore<GEntry>;
   readonly #password: string;
 
   constructor(
     {
       store,
       password,
-    }: IPasswordEncryptedAsyncStoreOptions,
+    }: IPasswordEncryptedAsyncStoreOptions<GEntry>,
   ) {
     this.#store = store;
     this.#password = password;
   }
 
-  get(
-    key: string,
+  get<GKey extends InferAsyncStoreEntryGKey<GEntry>>(
+    key: GKey,
     abortable: Abortable,
-  ): AsyncTask<any> {
+  ): AsyncTask<IAsyncStoreGetFunctionReturnedValue<GEntry, GKey>> {
     return this.#store.get(key, abortable)
-      .successful((encrypted: Uint8Array): AsyncTask<any> => {
-        return decryptDataUsingPassword({
-          password: this.#password,
-          encrypted,
-          abortable,
-        });
+      .successful((encrypted: Uint8Array | undefined): IAsyncTaskInput<any> => {
+        if (encrypted === void 0) {
+          return void 0;
+        } else {
+          return decryptDataUsingPassword({
+            password: this.#password,
+            encrypted,
+            abortable,
+          });
+        }
       });
   }
 
-  set(
-    key: string,
-    value: any,
+  set<GKey extends InferAsyncStoreEntryGKey<GEntry>>(
+    key: GKey,
+    value: IAsyncStoreSetFunctionValue<GEntry, GKey>,
     abortable: Abortable,
   ): AsyncTask<void> {
     return encryptDataUsingPassword({
@@ -48,12 +70,12 @@ export class PasswordEncryptedAsyncStore implements IAsyncStore {
       abortable,
     })
       .successful((encrypted: Uint8Array): AsyncTask<void> => {
-        return this.#store.set(key, encrypted, abortable);
+        return this.#store.set<any>(key, encrypted, abortable);
       });
   }
 
   delete(
-    key: string,
+    key: InferAsyncStoreEntryGKey<GEntry>,
     abortable: Abortable,
   ): AsyncTask<void> {
     return this.#store.delete(key, abortable);
@@ -67,13 +89,13 @@ export class PasswordEncryptedAsyncStore implements IAsyncStore {
 
   keys(
     abortable: Abortable,
-  ): AsyncTask<string[]> {
+  ): AsyncTask<InferAsyncStoreEntryGKey<GEntry>[]> {
     return this.#store.keys(abortable);
   }
 
   values(
     abortable: Abortable,
-  ): AsyncTask<any[]> {
+  ): AsyncTask<InferAsyncStoreEntryGValue<GEntry>[]> {
     return this.#store.values(abortable)
       .successful((values: Uint8Array[], abortable: Abortable): AsyncTask<any[]> => {
         return AsyncTask.all(
@@ -93,18 +115,18 @@ export class PasswordEncryptedAsyncStore implements IAsyncStore {
 
   entries(
     abortable: Abortable,
-  ): AsyncTask<IAsyncStoreEntry[]> {
+  ): AsyncTask<GEntry[]> {
     return this.#store.entries(abortable)
-      .successful((entries: IAsyncStoreEntry[], abortable: Abortable): AsyncTask<IAsyncStoreEntry[]> => {
+      .successful((entries: IPasswordEncryptedAsyncStoreSubStoreEntry<GEntry>[], abortable: Abortable): AsyncTask<GEntry[]> => {
         return AsyncTask.all(
-          entries.map(([key, encrypted]: [string, Uint8Array]): IAsyncTaskFactory<IAsyncStoreEntry> => {
-            return (abortable: Abortable): AsyncTask<IAsyncStoreEntry> => {
+          entries.map(([key, encrypted]: IPasswordEncryptedAsyncStoreSubStoreEntry<GEntry>): IAsyncTaskFactory<any> => {
+            return (abortable: Abortable): AsyncTask<any> => {
               return decryptDataUsingPassword({
                 password: this.#password,
                 encrypted,
                 abortable,
               })
-                .successful((value: any): IAsyncStoreEntry => {
+                .successful((value: any): any => {
                   return [
                     key,
                     value,
@@ -118,6 +140,10 @@ export class PasswordEncryptedAsyncStore implements IAsyncStore {
   }
 }
 
-
-
+// const a = new PasswordEncryptedAsyncStore<[string, boolean]>({
+//   password: 'anc',
+//   store: await IDBAsyncStore.open<[string, Uint8Array]>({
+//     abortable: Abortable.never,
+//   }),
+// });
 

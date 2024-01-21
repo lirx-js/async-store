@@ -1,8 +1,9 @@
 import { Abortable, AsyncTask } from '@lirx/async-task';
+import { IGenericAsyncStoreEntry, InferAsyncStoreEntryGValue } from '../../types/async-store-entry.type';
 
-export interface IAsyncStoreValuesFunction {
+export interface IAsyncStoreValuesFunction<GEntry extends IGenericAsyncStoreEntry> {
   (
     abortable: Abortable,
-  ): AsyncTask<any[]>;
+  ): AsyncTask<InferAsyncStoreEntryGValue<GEntry>[]>;
 }
 
